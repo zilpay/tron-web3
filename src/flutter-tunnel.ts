@@ -13,6 +13,14 @@ interface FlutterMessage {
   icon?: string;
   websiteName?: string;
   websiteIcon?: string;
+  websiteDescription?: string | null;
+  websiteTitle?: string | null;
+  colors?: {
+    primary?: string;
+    secondary?: string;
+    background?: string;
+    text?: string;
+  } | null;
 }
 
 interface FlutterNotifyMessage {
@@ -45,6 +53,9 @@ export class FlutterTunnel extends BaseTunnel {
       icon: meta.websiteIcon,
       websiteName: meta.websiteName,
       websiteIcon: meta.websiteIcon,
+      websiteDescription: meta.description,
+      websiteTitle: meta.title,
+      colors: meta.colors,
     };
 
     (window as any).flutter_inappwebview
