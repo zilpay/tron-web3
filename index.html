@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TRON MATRIX OS</title>
+<style>
+:root {
+  --fg: #0f0;
+  --bg: #000;
+  --fnt: 'Courier New', Courier, monospace;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--fnt);
+  margin: 0;
+  padding: 20px;
+  text-transform: uppercase;
+}
+.grid {
+  display: grid;
+  grid-template-columns: 250px 1fr;
+  gap: 20px;
+  height: calc(100vh - 40px);
+}
+.box {
+  border: 1px solid var(--fg);
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+}
+.title {
+  border-bottom: 1px solid var(--fg);
+  padding-bottom: 10px;
+  margin-bottom: 15px;
+  font-weight: bold;
+}
+.btn {
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--fg);
+  padding: 10px;
+  font-family: var(--fnt);
+  text-transform: uppercase;
+  cursor: pointer;
+  margin-bottom: 10px;
+  text-align: left;
+}
+.btn:hover, .btn:active {
+  background: var(--fg);
+  color: var(--bg);
+}
+.data-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  font-size: 0.9rem;
+  word-break: break-all;
+}
+.console {
+  overflow-y: auto;
+  flex: 1;
+}
+.log {
+  margin-bottom: 10px;
+}
+.log pre {
+  margin: 5px 0 0 0;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+const el = (tag, attrs = {}, children = []) => {
+  const e = document.createElement(tag);
+  Object.entries(attrs).forEach(([k, v]) => {
+    if (k.startsWith('on')) e.addEventListener(k.substring(2).toLowerCase(), v);
+    else if (k === 'style') Object.assign(e.style, v);
+    else e[k] = v;
+  });
+  (Array.isArray(children) ? children : [children]).forEach(c => {
+    e.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+  });
+  return e;
+};
+
+const state = {
+  connected: false,
+  address: 'NULL',
+  chain: 'NULL',
+  logs: []
+};
+
+const format = (data) => {
+  if (data instanceof Error) return data.message;
+  if (typeof data === 'object') return JSON.stringify(data, null, 2);
+  return String(data);
+};
+
+const log = (msg, data = null) => {
+  state.logs.push({ msg, data, time: new Date().toLocaleTimeString() });
+  renderConsole();
+};
+
+const Header = (title) => el('div', { className: 'title' }, title);
+
+const DataRow = (label, val) => el('div', { className: 'data-row' }, [
+  el('span', {}, label),
+  el('span', {}, val)
+]);
+
+const Button = (label, action) => el('button', {
+  className: 'btn',
+  onClick: async () => {
+    log(`EXEC: ${label}`);
+    try {
+      const res = await action();
+      log(`DONE: ${label}`, res);
+    } catch (err) {
+      log(`FAIL: ${label}`, err);
+    }
+  }
+}, label);
+
+const renderConsole = () => {
+  const con = document.getElementById('console-output');
+  if (!con) return;
+  con.innerHTML = '';
+  state.logs.forEach(l => {
+    const entry = el('div', { className: 'log' }, [
+      el('span', {}, `[${l.time}] ${l.msg}`),
+      l.data ? el('pre', {}, format(l.data)) : ''
+    ]);
+    con.appendChild(entry);
+  });
+  con.scrollTop = con.scrollHeight;
+};
+
+const updateState = (newState) => {
+  Object.assign(state, newState);
+  renderApp();
+  renderConsole();
+};
+
+const connectWallet = async () => {
+  const accounts = await window.tron.request({ method: 'eth_requestAccounts' });
+  const w = window.tron.tronWeb;
+  updateState({
+    connected: true,
+    address: accounts[0] || w.defaultAddress?.base58 || 'UNKNOWN',
+    chain: w.fullNode?.host || 'MOCK_CHAIN'
+  });
+  return accounts;
+};
+
+const actions = [
+  { label: 'CONNECT', fn: connectWallet },
+  { label: 'SIGN_TX', fn: () => window.tron.tronWeb.trx.sign("MOCK_TX", false, true) },
+  { label: 'SIGN_MSG_V2', fn: () => window.tron.tronWeb.trx.signMessageV2("MOCK_MSG", false, {}) },
+  { label: 'MULTI_SIGN', fn: () => window.tron.tronWeb.trx.multiSign({ raw_data: { contract: [{ parameter: { value: "MOCK" } }] } }, false, 0) },
+  { label: 'SIGN_TYPED', fn: () => window.tron.tronWeb.trx._signTypedData({ name: "T" }, { P: [{ name: "n", type: "string" }] }, { n: "B" }, false) }
+];
+
+const renderApp = () => {
+  const root = document.getElementById('app');
+  root.innerHTML = '';
+  
+  const controls = el('div', { className: 'box' }, [
+    Header('SYSTEM CONTROLS'),
+    ...actions.map(a => Button(a.label, a.fn)),
+    Header('NETWORK DATA'),
+    DataRow('STATUS', state.connected ? 'ONLINE' : 'OFFLINE'),
+    DataRow('ADDRESS', state.address),
+    DataRow('CHAIN', state.chain)
+  ]);
+
+  const terminal = el('div', { className: 'box' }, [
+    Header('TERMINAL OUTPUT'),
+    el('div', { className: 'console', id: 'console-output' })
+  ]);
+
+  root.appendChild(el('div', { className: 'grid' }, [controls, terminal]));
+};
+
+const setupBridge = () => {
+  window.flutter_inappwebview = {
+    callHandler: (name, payloadStr) => {
+      const payload = JSON.parse(payloadStr);
+      setTimeout(() => {
+        const response = { type: "response", uuid: payload.uuid, payload: {} };
+        const m = payload.payload.method;
+        if (m === "getInitProviderData") {
+          response.payload.result = {
+            chainId: "0x2b6653dc",
+            address: "T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb",
+            isAuth: true,
+            name: "MatrixOS",
+            type: "mock"
+          };
+        } else if (m === "eth_requestAccounts") {
+          response.payload.result = ["T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb"];
+        } else {
+          response.payload.result = `SUCCESS_${m}`;
+        }
+        window.postMessage(response, "*");
+      }, 50);
+    }
+  };
+};
+
+setupBridge();
+renderApp();
+
+window.addEventListener('tron#initialized', () => {
+  log('SYS: TRON INJECTED');
+});
+</script>
+<script src="/dist/index.js"></script>
+</body>
+</html>

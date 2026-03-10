@@ -25,7 +25,8 @@
   "scripts": {
     "dev": "bun build ./index.ts --outdir ./dist --target browser --format iife --no-minify",
     "build": "bun build index.ts --outdir ./dist --target browser --minify --sourcemap=none --format iife",
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "serve": "bun run build && bun run serve.js"
   },
   "devDependencies": {
     "@types/bun": "latest",
