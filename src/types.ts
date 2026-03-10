@@ -28,7 +28,8 @@ export interface TronProvider {
   on(event: 'chainChanged', callback: (chainId: string) => void): void;
   on(event: 'accountsChanged', callback: (accounts: string[]) => void): void;
   on(event: 'message', callback: (message: ProviderMessage) => void): void;
-  removeListener(event: string, callback: EventCallback): void;
+  on(event: string, callback: (...args: any[]) => void): void;
+  removeListener(event: string, callback: (...args: any[]) => void): void;
 }
 
 export interface BearbyEventData {
@@ -55,3 +56,22 @@ export interface MetaData {
     text?: string;
   } | null;
 }
+
+export interface TIP6963ProviderInfo {
+  uuid: string;
+  name: string;
+  icon: string;
+  rdns: string;
+}
+
+export interface TIP6963ProviderDetail {
+  info: TIP6963ProviderInfo;
+  provider: TronProvider;
+}
+
+export interface TIP6963AnnounceProviderEvent extends CustomEvent<TIP6963ProviderDetail> {
+  type: 'TIP6963:announceProvider';
+}
+
+export const TIP6963_ANNOUNCE_PROVIDER = 'TIP6963:announceProvider';
+export const TIP6963_REQUEST_PROVIDER = 'TIP6963:requestProvider';

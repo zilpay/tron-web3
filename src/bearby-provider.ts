@@ -41,7 +41,7 @@ const SUPPORTED_METHODS = new Set([
   'wallet_addTronChain',
 ]);
 
-const win = window as Record<string, unknown>;
+const win = typeof window !== 'undefined' ? window as unknown as Record<string, unknown> : {} as Record<string, unknown>;
 
 export class BearbyProviderImpl implements TronProvider {
   readonly isBearby = true;
@@ -200,11 +200,11 @@ export class BearbyProviderImpl implements TronProvider {
     });
   }
 
-  on(event: EventName, callback: EventCallback): void {
+  on(event: string, callback: (...args: any[]) => void): void {
     this.#listeners.get(event)?.add(callback);
   }
 
-  removeListener(event: string, callback: EventCallback): void {
+  removeListener(event: string, callback: (...args: any[]) => void): void {
     this.#listeners.get(event)?.delete(callback);
   }
 }
