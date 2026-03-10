@@ -1,0 +1,118 @@
+<html>
+<head>
+  <title>TronChannel Test</title>
+</head>
+<body>
+  <h1>TronChannel Test Page</h1>
+  <div id="logs" style="font-family: monospace; background: #1a1a1a; color: #0f0; padding: 20px; height: 400px; overflow: auto;"></div>
+  <div style="margin-top: 20px;">
+    <button onclick="testChannel()">Test Channel Send</button>
+    <button onclick="testGetBalance()">Test Get Balance</button>
+    <button onclick="checkFlutter()">Check Flutter Available</button>
+  </div>
+
+  <script type="module" src="dist/index.js"></script>
+  <script>
+    const logsEl = document.getElementById('logs');
+    
+    function log(msg, type = 'info') {
+      const colors = { info: '#0f0', error: '#f00', success: '#0ff', warn: '#ff0' };
+      const time = new Date().toISOString().split('T')[1].split('.')[0];
+      const line = document.createElement('div');
+      line.style.color = colors[type] || '#0f0';
+      line.textContent = '[' + time + '] ' + msg;
+      logsEl.appendChild(line);
+      logsEl.scrollTop = logsEl.scrollHeight;
+      console.log(msg);
+    }
+
+    function checkFlutter() {
+      log('=== Checking Flutter Environment ===');
+      log('window.flutter_inappwebview: ' + typeof window.flutter_inappwebview);
+      log('window.flutter: ' + typeof window.flutter);
+      log('window.tron: ' + typeof window.tron);
+      
+      if (typeof window.flutter_inappwebview !== 'undefined') {
+        log('Flutter InAppWebView is available!', 'success');
+        var fiw = window.flutter_inappwebview;
+        log('flutter_inappwebview keys: [' + Object.keys(fiw).join(', ') + ']');
+        for (var key in fiw) {
+          log('  ' + key + ': ' + typeof fiw[key], 'info');
+        }
+      } else {
+        log('Flutter InAppWebView NOT available - running in regular browser', 'warn');
+      }
+
+      if (typeof window.flutter !== 'undefined') {
+        log('window.flutter keys: [' + Object.keys(window.flutter).join(', ') + ']', 'info');
+      }
+
+      log('window.webkit: ' + typeof window.webkit);
+      if (typeof window.webkit !== 'undefined' && window.webkit.messageHandlers) {
+        log('webkit.messageHandlers keys: [' + Object.keys(window.webkit.messageHandlers).join(', ') + ']', 'info');
+      }
+    }
+
+    async function testChannel() {
+      log('=== Testing TronChannel ===');
+      
+      if (typeof window.tron === 'undefined') {
+        log('window.tron is not defined!', 'error');
+        return;
+      }
+
+      var provider = window.tron;
+      log('Provider isBearby: ' + provider.isBearby);
+      
+      var testMessage = {
+        method: 'tron_chainId',
+        params: []
+      };
+
+      log('Sending test message: ' + JSON.stringify(testMessage));
+      
+      try {
+        var result = await provider.request(testMessage);
+        log('Response received: ' + JSON.stringify(result), 'success');
+      } catch (error) {
+        log('Error: ' + error.message, 'error');
+        log('Error details: ' + JSON.stringify(error), 'error');
+      }
+    }
+
+    async function testGetBalance() {
+      log('=== Testing Get Balance ===');
+      
+      if (typeof window.tron === 'undefined') {
+        log('window.tron is not defined!', 'error');
+        return;
+      }
+
+      var provider = window.tron;
+      
+      try {
+        var result = await provider.request({
+          method: 'tron_getBalance',
+          params: ['TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t']
+        });
+        log('Balance result: ' + JSON.stringify(result), 'success');
+      } catch (error) {
+        log('Balance error: ' + error.message, 'error');
+      }
+    }
+
+    window.addEventListener('message', function(event) {
+      log('[MESSAGE EVENT] Received: ' + JSON.stringify(event.data).substring(0, 200));
+    });
+
+    window.addEventListener('tron#initialized', function() {
+      log('[EVENT] tron#initialized fired!', 'success');
+    });
+
+    setTimeout(function() {
+      log('Page loaded. Click buttons to test channel.');
+      checkFlutter();
+    }, 500);
+  </script>
+</body>
+</html>
