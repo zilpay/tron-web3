@@ -37,19 +37,23 @@ export class TronProvider {
     this.tronProvider = new Proxy(new EventEmitter(), {
       deleteProperty: () => true,
     });
+    
+    this.tronProvider.isBearby = true;
+    this.tronProvider.request = (args: any) => this.doTronRequest(args);
+    this.tronProvider.tronWeb = this.buildTronWebStub();
+  }
+
+  public getProvider(): any {
+    return this.tronProvider;
   }
 
   public async init(): Promise<void> {
     this.bindNotifyEvents();
     await this.initTronProvider();
-    this.setWindowTron(this.tronProvider);
     this.announceTip6963Event(this.tronProvider);
   }
 
   private async initTronProvider(): Promise<any> {
-    this.tronProvider.isBearby = true;
-    this.tronProvider.request = (args: any) => this.doTronRequest(args);
-
     const data = await this.getProviderInitData();
     this.chainId = data?.chainId;
     this.tronProvider.tronWeb = this.buildTronWebStub(data);
@@ -310,10 +314,6 @@ export class TronProvider {
         resolve(res);
       });
     });
-  }
-
-  private setWindowTron(provider: any): void {
-    window.tron = provider;
   }
 
   private announceTip6963Event(provider: any): void {
