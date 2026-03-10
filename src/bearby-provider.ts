@@ -46,10 +46,12 @@ const win = typeof window !== 'undefined' ? window as unknown as Record<string, 
 export class BearbyProviderImpl implements TronProvider {
   readonly isBearby = true;
   #listeners = new Map<string, Set<EventCallback>>();
-  #isFlutter = typeof window !== 'undefined' && typeof win.flutter_inappwebview !== 'undefined';
+  get #isFlutter() {
+    return typeof window !== 'undefined' && typeof win.flutter_inappwebview !== 'undefined';
+  }
 
   constructor() {
-    for (const event of ['connect', 'disconnect', 'chainChanged', 'accountsChanged', 'message'] as const) {
+    for (const event of ['connect', 'disconnect', 'chainChanged', 'accountsChanged', 'message', 'setAccount', 'setNode'] as const) {
       this.#listeners.set(event, new Set());
     }
 

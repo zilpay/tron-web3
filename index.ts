@@ -1,9 +1,11 @@
 import { BearbyProviderImpl } from './src/bearby-provider.ts';
 import { announceProvider, type WalletInfo } from './src/discovery.ts';
+import { injectTronWeb } from './src/tronlink.ts';
 
 export type * from './src/types.ts';
 export { BearbyProviderImpl } from './src/bearby-provider.ts';
 export { announceProvider, type WalletInfo } from './src/discovery.ts';
+export { injectTronWeb } from './src/tronlink.ts';
 
 const BEARBY_WALLET_INFO: WalletInfo = {
   name: 'Bearby Wallet',
@@ -13,23 +15,28 @@ const BEARBY_WALLET_INFO: WalletInfo = {
 
 const win = typeof window !== 'undefined' ? window as unknown as Record<string, unknown> : {} as Record<string, unknown>;
 
+export function connectTronLink(): void {
+  const provider = win.tron as BearbyProviderImpl | undefined;
+  if (!provider) return;
+  injectTronWeb(provider);
+}
+
 (function () {
   if (typeof window === 'undefined' || win.__bearbyTronInjected) return;
 
   try {
     const provider = new BearbyProviderImpl();
     announceProvider(provider, BEARBY_WALLET_INFO);
+    injectTronWeb(provider);
 
-    if (!('tron' in window)) {
-      try {
-        Object.defineProperty(window, 'tron', {
-          value: provider,
-          writable: false,
-          configurable: true,
-        });
-      } catch {
-        win.tron = provider;
-      }
+    try {
+      Object.defineProperty(window, 'tron', {
+        value: provider,
+        writable: false,
+        configurable: true,
+      });
+    } catch {
+      win.tron = provider;
     }
 
     win.__bearbyTronInjected = true;

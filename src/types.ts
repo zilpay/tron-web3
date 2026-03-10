@@ -20,6 +20,12 @@ export interface ProviderMessage {
 
 export type EventCallback = (...args: unknown[]) => void;
 
+export interface NodeConfig {
+  fullNode: string;
+  solidityNode: string;
+  eventServer: string;
+}
+
 export interface TronProvider {
   readonly isBearby: boolean;
   request(payload: RequestPayload): Promise<unknown>;
@@ -28,13 +34,15 @@ export interface TronProvider {
   on(event: 'chainChanged', callback: (chainId: string) => void): void;
   on(event: 'accountsChanged', callback: (accounts: string[]) => void): void;
   on(event: 'message', callback: (message: ProviderMessage) => void): void;
+  on(event: 'setAccount', callback: (address: string) => void): void;
+  on(event: 'setNode', callback: (node: NodeConfig) => void): void;
   on(event: string, callback: (...args: any[]) => void): void;
   removeListener(event: string, callback: (...args: any[]) => void): void;
 }
 
 export interface BearbyEventData {
   event: string;
-  data: ProviderConnectInfo | ProviderRpcError | string | string[] | ProviderMessage;
+  data: ProviderConnectInfo | ProviderRpcError | string | string[] | ProviderMessage | NodeConfig;
 }
 
 export interface BearbyResponseData {
