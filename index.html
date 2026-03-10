@@ -1,227 +1,693 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TRON MATRIX OS</title>
-<style>
-:root {
-  --fg: #0f0;
-  --bg: #000;
-  --fnt: 'Courier New', Courier, monospace;
-}
-* {
-  box-sizing: border-box;
-}
-body {
-  background: var(--bg);
-  color: var(--fg);
-  font-family: var(--fnt);
-  margin: 0;
-  padding: 20px;
-  text-transform: uppercase;
-}
-.grid {
-  display: grid;
-  grid-template-columns: 250px 1fr;
-  gap: 20px;
-  height: calc(100vh - 40px);
-}
-.box {
-  border: 1px solid var(--fg);
-  padding: 15px;
-  display: flex;
-  flex-direction: column;
-}
-.title {
-  border-bottom: 1px solid var(--fg);
-  padding-bottom: 10px;
-  margin-bottom: 15px;
-  font-weight: bold;
-}
-.btn {
-  background: var(--bg);
-  color: var(--fg);
-  border: 1px solid var(--fg);
-  padding: 10px;
-  font-family: var(--fnt);
-  text-transform: uppercase;
-  cursor: pointer;
-  margin-bottom: 10px;
-  text-align: left;
-}
-.btn:hover, .btn:active {
-  background: var(--fg);
-  color: var(--bg);
-}
-.data-row {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 10px;
-  font-size: 0.9rem;
-  word-break: break-all;
-}
-.console {
-  overflow-y: auto;
-  flex: 1;
-}
-.log {
-  margin-bottom: 10px;
-}
-.log pre {
-  margin: 5px 0 0 0;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TRON API TEST SUITE // SYSTEM SHOCK 2 INTERFACE</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #000000;
+      color: #00ff41;
+      font-family: 'VT323', 'Courier New', monospace;
+      font-size: 18px;
+      line-height: 1.4;
+      overflow: hidden;
+      height: 100vh;
+      position: relative;
+    }
+
+    /* CRT Scanline Effect */
+    body::before {
+      content: "";
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: repeating-linear-gradient(
+        0deg,
+        rgba(0, 0, 0, 0.15),
+        rgba(0, 0, 0, 0.15) 1px,
+        transparent 1px,
+        transparent 2px
+      );
+      pointer-events: none;
+      z-index: 1000;
+      animation: flicker 0.15s infinite;
+    }
+
+    /* CRT Screen Curving/Glow */
+    body::after {
+      content: "";
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(
+        ellipse at center,
+        transparent 0%,
+        rgba(0, 0, 0, 0.3) 100%
+      );
+      pointer-events: none;
+      z-index: 999;
+    }
+
+    @keyframes flicker {
+      0% { opacity: 0.97; }
+      50% { opacity: 1; }
+      100% { opacity: 0.98; }
+    }
+
+    #container {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      padding: 20px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    #header {
+      border-bottom: 2px solid #00ff41;
+      padding-bottom: 10px;
+      margin-bottom: 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+    }
+
+    #header h1 {
+      font-size: 32px;
+      text-shadow: 0 0 10px #00ff41;
+      letter-spacing: 2px;
+    }
+
+    #status {
+      font-size: 20px;
+      color: #ffaa00;
+    }
+
+    #main {
+      display: flex;
+      flex: 1;
+      gap: 15px;
+      overflow: hidden;
+    }
+
+    #sidebar {
+      width: 300px;
+      border-right: 1px solid #00ff41;
+      padding-right: 15px;
+      overflow-y: auto;
+    }
+
+    #log {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px;
+      border: 1px solid #00ff41;
+      background: rgba(0, 255, 65, 0.03);
+    }
+
+    .log-entry {
+      margin: 4px 0;
+      padding: 4px 8px;
+      background: rgba(0, 0, 0, 0.5);
+      border-left: 2px solid transparent;
+    }
+
+    .log-entry.info { border-left-color: #00ff41; }
+    .log-entry.success { border-left-color: #41ff00; background: rgba(65, 255, 0, 0.1); }
+    .log-entry.warning { border-left-color: #ffaa00; color: #ffaa00; }
+    .log-entry.error { border-left-color: #ff0041; color: #ff0041; }
+    .log-entry.request { border-left-color: #00aaff; color: #00aaff; }
+    .log-entry.response { border-left-color: #aa00ff; color: #aa00ff; }
+
+    .timestamp {
+      color: #666666;
+      margin-right: 10px;
+    }
+
+    #commands {
+      margin-top: 10px;
+      border-top: 1px solid #00ff41;
+      padding-top: 10px;
+    }
+
+    .test-btn {
+      display: block;
+      width: 100%;
+      padding: 8px 12px;
+      margin: 4px 0;
+      background: transparent;
+      border: 1px solid #00ff41;
+      color: #00ff41;
+      font-family: inherit;
+      font-size: 16px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: left;
+    }
+
+    .test-btn:hover {
+      background: rgba(0, 255, 65, 0.2);
+      box-shadow: 0 0 10px rgba(0, 255, 65, 0.5);
+    }
+
+    .test-btn:active {
+      background: rgba(0, 255, 65, 0.4);
+    }
+
+    .test-btn.disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      border-color: #666;
+      color: #666;
+    }
+
+    .category {
+      font-size: 20px;
+      color: #ffaa00;
+      margin: 15px 0 8px 0;
+      padding-bottom: 4px;
+      border-bottom: 1px dashed #ffaa00;
+    }
+
+    #prompt {
+      display: flex;
+      align-items: center;
+      margin-top: 10px;
+      padding: 10px;
+      border-top: 2px solid #00ff41;
+    }
+
+    .prompt-symbol {
+      color: #ffaa00;
+      margin-right: 8px;
+      font-size: 24px;
+    }
+
+    #command-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: #00ff41;
+      font-family: inherit;
+      font-size: 18px;
+      outline: none;
+      caret-color: #00ff41;
+    }
+
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: #000;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #00ff41;
+      opacity: 0.5;
+    }
+
+    .blink {
+      animation: blink 1s infinite;
+    }
+
+    @keyframes blink {
+      0%, 49% { opacity: 1; }
+      50%, 100% { opacity: 0; }
+    }
+  </style>
 </head>
 <body>
-<div id="app"></div>
-<script>
-const el = (tag, attrs = {}, children = []) => {
-  const e = document.createElement(tag);
-  Object.entries(attrs).forEach(([k, v]) => {
-    if (k.startsWith('on')) e.addEventListener(k.substring(2).toLowerCase(), v);
-    else if (k === 'style') Object.assign(e.style, v);
-    else e[k] = v;
-  });
-  (Array.isArray(children) ? children : [children]).forEach(c => {
-    e.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
-  });
-  return e;
-};
+  <div id="container">
+    <div id="header">
+      <h1>BEARBY TRON PROVIDER</h1>
+      <div id="status">INITIALIZING...</div>
+    </div>
 
-const state = {
-  connected: false,
-  address: 'NULL',
-  chain: 'NULL',
-  logs: []
-};
+    <div id="main">
+      <div id="sidebar">
+        <div class="category">CONNECTION</div>
+        <button class="test-btn" data-test="provider">Check Provider</button>
+        <button class="test-btn" data-test="init">Init Provider</button>
+        <button class="test-btn" data-test="state">Get State</button>
+        <button class="test-btn" data-test="accounts">Get Accounts</button>
 
-const format = (data) => {
-  if (data instanceof Error) return data.message;
-  if (typeof data === 'object') return JSON.stringify(data, null, 2);
-  return String(data);
-};
+        <div class="category">EVENTS</div>
+        <button class="test-btn" data-test="listen-events">Listen Events</button>
+        <button class="test-btn" data-test="trigger-connect">Simulate Connect</button>
+        <button class="test-btn" data-test="trigger-accounts">Simulate Accounts</button>
 
-const log = (msg, data = null) => {
-  state.logs.push({ msg, data, time: new Date().toLocaleTimeString() });
-  renderConsole();
-};
+        <div class="category">TRONWEB STUB</div>
+        <button class="test-btn" data-test="tronweb">Check TronWeb</button>
+        <button class="test-btn" data-test="address">Get Default Address</button>
+        <button class="test-btn" data-test="ready">Check Ready State</button>
 
-const Header = (title) => el('div', { className: 'title' }, title);
+        <div class="category">SIGNING</div>
+        <button class="test-btn" data-test="sign">Test Sign</button>
+        <button class="test-btn" data-test="sign-message">Test Sign Message V2</button>
+        <button class="test-btn" data-test="multi-sign">Test MultiSign</button>
+        <button class="test-btn" data-test="typed-data">Test Sign Typed Data</button>
 
-const DataRow = (label, val) => el('div', { className: 'data-row' }, [
-  el('span', {}, label),
-  el('span', {}, val)
-]);
+        <div class="category">RPC REQUESTS</div>
+        <button class="test-btn" data-test="rpc-chain">Get Chain ID</button>
+        <button class="test-btn" data-test="rpc-block">Get Block Number</button>
+        <button class="test-btn" data-test="rpc-balance">Get Balance</button>
 
-const Button = (label, action) => el('button', {
-  className: 'btn',
-  onClick: async () => {
-    log(`EXEC: ${label}`);
-    try {
-      const res = await action();
-      log(`DONE: ${label}`, res);
-    } catch (err) {
-      log(`FAIL: ${label}`, err);
+        <div class="category">SYSTEM</div>
+        <button class="test-btn" data-test="clear">Clear Log</button>
+        <button class="test-btn" data-test="run-all">RUN ALL TESTS</button>
+      </div>
+
+      <div id="log"></div>
+    </div>
+
+    <div id="prompt">
+      <span class="prompt-symbol">➜</span>
+      <input type="text" id="command-input" placeholder="Type command or press buttons..." autocomplete="off" spellcheck="false">
+    </div>
+  </div>
+
+  <script src="/dist/index.js"></script>
+  <script>
+    const log = document.getElementById('log');
+    const status = document.getElementById('status');
+    const commandInput = document.getElementById('command-input');
+    const testButtons = document.querySelectorAll('.test-btn');
+
+    let provider = null;
+    let testResults = {};
+    let eventLog = [];
+
+    function getTimestamp() {
+      const now = new Date();
+      return now.toTimeString().split(' ')[0];
     }
-  }
-}, label);
 
-const renderConsole = () => {
-  const con = document.getElementById('console-output');
-  if (!con) return;
-  con.innerHTML = '';
-  state.logs.forEach(l => {
-    const entry = el('div', { className: 'log' }, [
-      el('span', {}, `[${l.time}] ${l.msg}`),
-      l.data ? el('pre', {}, format(l.data)) : ''
-    ]);
-    con.appendChild(entry);
-  });
-  con.scrollTop = con.scrollHeight;
-};
+    function logMessage(message, type = 'info', data = null) {
+      const entry = document.createElement('div');
+      entry.className = `log-entry ${type}`;
 
-const updateState = (newState) => {
-  Object.assign(state, newState);
-  renderApp();
-  renderConsole();
-};
+      const timeSpan = document.createElement('span');
+      timeSpan.className = 'timestamp';
+      timeSpan.textContent = `[${getTimestamp()}]`;
+      entry.appendChild(timeSpan);
 
-const connectWallet = async () => {
-  const accounts = await window.tron.request({ method: 'eth_requestAccounts' });
-  const w = window.tron.tronWeb;
-  updateState({
-    connected: true,
-    address: accounts[0] || w.defaultAddress?.base58 || 'UNKNOWN',
-    chain: w.fullNode?.host || 'MOCK_CHAIN'
-  });
-  return accounts;
-};
+      const msgSpan = document.createElement('span');
+      msgSpan.textContent = message;
+      entry.appendChild(msgSpan);
 
-const actions = [
-  { label: 'CONNECT', fn: connectWallet },
-  { label: 'SIGN_TX', fn: () => window.tron.tronWeb.trx.sign("MOCK_TX", false, true) },
-  { label: 'SIGN_MSG_V2', fn: () => window.tron.tronWeb.trx.signMessageV2("MOCK_MSG", false, {}) },
-  { label: 'MULTI_SIGN', fn: () => window.tron.tronWeb.trx.multiSign({ raw_data: { contract: [{ parameter: { value: "MOCK" } }] } }, false, 0) },
-  { label: 'SIGN_TYPED', fn: () => window.tron.tronWeb.trx._signTypedData({ name: "T" }, { P: [{ name: "n", type: "string" }] }, { n: "B" }, false) }
-];
+      if (data) {
+        const dataDiv = document.createElement('div');
+        dataDiv.style.marginLeft = '60px';
+        dataDiv.style.marginTop = '4px';
+        dataDiv.style.color = '#888';
+        dataDiv.style.fontSize = '14px';
+        dataDiv.textContent = typeof data === 'object' ? JSON.stringify(data, null, 2) : data;
+        entry.appendChild(dataDiv);
+      }
 
-const renderApp = () => {
-  const root = document.getElementById('app');
-  root.innerHTML = '';
-  
-  const controls = el('div', { className: 'box' }, [
-    Header('SYSTEM CONTROLS'),
-    ...actions.map(a => Button(a.label, a.fn)),
-    Header('NETWORK DATA'),
-    DataRow('STATUS', state.connected ? 'ONLINE' : 'OFFLINE'),
-    DataRow('ADDRESS', state.address),
-    DataRow('CHAIN', state.chain)
-  ]);
+      log.appendChild(entry);
+      log.scrollTop = log.scrollHeight;
 
-  const terminal = el('div', { className: 'box' }, [
-    Header('TERMINAL OUTPUT'),
-    el('div', { className: 'console', id: 'console-output' })
-  ]);
+      // Store event
+      eventLog.push({ timestamp: getTimestamp(), type, message, data });
+    }
 
-  root.appendChild(el('div', { className: 'grid' }, [controls, terminal]));
-};
+    function updateStatus(text, isError = false) {
+      status.textContent = text;
+      status.style.color = isError ? '#ff0041' : '#00ff41';
+      status.style.textShadow = isError ? '0 0 10px #ff0041' : '0 0 10px #00ff41';
+    }
 
-const setupBridge = () => {
-  window.flutter_inappwebview = {
-    callHandler: (name, payloadStr) => {
-      const payload = JSON.parse(payloadStr);
-      setTimeout(() => {
-        const response = { type: "response", uuid: payload.uuid, payload: {} };
-        const m = payload.payload.method;
-        if (m === "getInitProviderData") {
-          response.payload.result = {
-            chainId: "0x2b6653dc",
-            address: "T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb",
-            isAuth: true,
-            name: "MatrixOS",
-            type: "mock"
-          };
-        } else if (m === "eth_requestAccounts") {
-          response.payload.result = ["T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb"];
-        } else {
-          response.payload.result = `SUCCESS_${m}`;
+    function setButtonsEnabled(enabled) {
+      testButtons.forEach(btn => {
+        if (btn.dataset.test !== 'clear' && btn.dataset.test !== 'run-all') {
+          btn.classList.toggle('disabled', !enabled);
         }
-        window.postMessage(response, "*");
-      }, 50);
+      });
     }
-  };
-};
 
-setupBridge();
-renderApp();
+    async function runTest(testName) {
+      try {
+        switch (testName) {
+          case 'provider':
+            const hasProvider = !!window.tron;
+            testResults.provider = hasProvider;
+            logMessage(`Provider exists: ${hasProvider}`, hasProvider ? 'success' : 'error');
+            if (hasProvider) provider = window.tron;
+            return hasProvider;
 
-window.addEventListener('tron#initialized', () => {
-  log('SYS: TRON INJECTED');
-});
-</script>
-<script src="/dist/index.js"></script>
+          case 'init':
+            if (!provider) {
+              logMessage('Provider not found. Run "Check Provider" first.', 'warning');
+              return false;
+            }
+            logMessage('Initializing provider...', 'info');
+            await provider.init?.();
+            logMessage('Provider initialized', 'success');
+            return true;
+
+          case 'state':
+            if (!provider) return false;
+            const hasTronWeb = !!provider.tronWeb;
+            logMessage(`Has tronWeb: ${hasTronWeb}`, hasTronWeb ? 'success' : 'warning');
+            testResults.hasTronWeb = hasTronWeb;
+            return hasTronWeb;
+
+          case 'accounts':
+            if (!provider) return false;
+            try {
+              const accounts = await provider.request({ method: 'eth_requestAccounts' });
+              logMessage(`Accounts: ${JSON.stringify(accounts)}`, 'success', accounts);
+              testResults.accounts = accounts;
+              return true;
+            } catch (err) {
+              logMessage(`Failed to get accounts: ${err.message || err}`, 'error');
+              return false;
+            }
+
+          case 'tronweb':
+            if (!provider?.tronWeb) {
+              logMessage('tronWeb not available', 'warning');
+              return false;
+            }
+            const twProps = {
+              ready: provider.tronWeb.ready,
+              defaultAddress: provider.tronWeb.defaultAddress,
+              hasTrx: !!provider.tronWeb.trx,
+              hasSign: !!provider.tronWeb.trx?.sign,
+              hasSignMessageV2: !!provider.tronWeb.trx?.signMessageV2,
+              hasMultiSign: !!provider.tronWeb.trx?.multiSign,
+              hasSignTypedData: !!provider.tronWeb.trx?._signTypedData,
+            };
+            logMessage('TronWeb properties:', 'success', twProps);
+            testResults.tronweb = twProps;
+            return true;
+
+          case 'address':
+            if (!provider?.tronWeb?.defaultAddress) {
+              logMessage('No default address available', 'warning');
+              return false;
+            }
+            const addr = provider.tronWeb.defaultAddress;
+            logMessage(`Default address: ${addr.base58 || addr.hex}`, 'success', addr);
+            testResults.address = addr;
+            return true;
+
+          case 'ready':
+            const ready = provider?.tronWeb?.ready ?? false;
+            logMessage(`Ready state: ${ready}`, ready ? 'success' : 'warning');
+            testResults.ready = ready;
+            return ready;
+
+          case 'listen-events':
+            if (!provider) return false;
+            logMessage('Setting up event listeners...', 'info');
+
+            provider.on('connect', (info) => {
+              logMessage('Event: connect', 'response', info);
+              eventLog.push({ event: 'connect', info });
+            });
+
+            provider.on('accountsChanged', (accounts) => {
+              logMessage('Event: accountsChanged', 'response', accounts);
+              eventLog.push({ event: 'accountsChanged', accounts });
+            });
+
+            provider.on('chainChanged', (chainInfo) => {
+              logMessage('Event: chainChanged', 'response', chainInfo);
+              eventLog.push({ event: 'chainChanged', chainInfo });
+            });
+
+            logMessage('Event listeners attached. Trigger events to test.', 'success');
+            return true;
+
+          case 'trigger-connect':
+            if (!provider) return false;
+            logMessage('Manually triggering connect event...', 'info');
+            provider.emit('connect', { chainId: '0x2b6653dc' });
+            return true;
+
+          case 'trigger-accounts':
+            if (!provider) return false;
+            const testAccounts = ['TXYZ...'];
+            logMessage('Manually triggering accountsChanged event...', 'info');
+            provider.emit('accountsChanged', testAccounts);
+            return true;
+
+          case 'rpc-chain':
+            if (!provider) return false;
+            try {
+              const chainId = await provider.request({ method: 'eth_chainId' });
+              logMessage(`Chain ID: ${chainId}`, 'success');
+              testResults.chainId = chainId;
+              return true;
+            } catch (err) {
+              logMessage(`eth_chainId failed: ${err.message || err}`, 'error');
+              return false;
+            }
+
+          case 'rpc-block':
+            if (!provider) return false;
+            try {
+              const blockNumber = await provider.request({ method: 'eth_blockNumber' });
+              logMessage(`Block number: ${blockNumber} (0x${parseInt(blockNumber).toString(16)})`, 'success');
+              testResults.blockNumber = blockNumber;
+              return true;
+            } catch (err) {
+              logMessage(`eth_blockNumber failed: ${err.message || err}`, 'error');
+              return false;
+            }
+
+          case 'rpc-balance':
+            if (!provider) return false;
+            try {
+              const accounts = await provider.request({ method: 'eth_requestAccounts' });
+              if (accounts?.[0]) {
+                const balance = await provider.request({
+                  method: 'eth_getBalance',
+                  params: [accounts[0], 'latest']
+                });
+                logMessage(`Balance of ${accounts[0]}: ${balance} wei`, 'success');
+                testResults.balance = balance;
+                return true;
+              }
+              return false;
+            } catch (err) {
+              logMessage(`eth_getBalance failed: ${err.message || err}`, 'error');
+              return false;
+            }
+
+          case 'sign':
+            if (!provider?.tronWeb?.ready) {
+              logMessage('Provider not ready for signing', 'warning');
+              return false;
+            }
+            // Create a minimal test transaction
+            const testTx = {
+              raw_data: {
+                contract: [{
+                  parameter: {
+                    value: {
+                      owner_address: 'TXYZmockAddress',
+                      to_address: 'TXYZmockToAddress',
+                      amount: 1000,
+                    }
+                  }
+                }]
+              }
+            };
+            logMessage('Testing sign method (this will trigger wallet prompt)...', 'info');
+            try {
+              const result = await provider.tronWeb.trx.sign(testTx);
+              logMessage('Sign successful', 'success', result ? 'Signature produced' : 'No signature');
+              return true;
+            } catch (err) {
+              logMessage(`Sign failed (user may have rejected): ${err.message || err}`, 'error');
+              return false;
+            }
+
+          case 'sign-message':
+            if (!provider?.tronWeb?.ready) {
+              logMessage('Provider not ready for signing', 'warning');
+              return false;
+            }
+            const testMessage = 'Test message for signature';
+            logMessage('Testing signMessageV2 (this will trigger wallet prompt)...', 'info');
+            try {
+              const result = await provider.tronWeb.trx.signMessageV2(testMessage);
+              logMessage('SignMessageV2 successful', 'success', result ? 'Signature produced' : 'No signature');
+              return true;
+            } catch (err) {
+              logMessage(`SignMessageV2 failed: ${err.message || err}`, 'error');
+              return false;
+            }
+
+          case 'multi-sign':
+            if (!provider?.tronWeb?.ready) {
+              logMessage('Provider not ready for multi-sign', 'warning');
+              return false;
+            }
+            logMessage('Testing multiSign (requires multi-permission account)...', 'warning');
+            // multiSign is complex and requires specific setup
+            logMessage('Skipped - requires multi-permission account configuration', 'info');
+            return false;
+
+          case 'typed-data':
+            if (!provider?.tronWeb?.ready) {
+              logMessage('Provider not ready for typed data signing', 'warning');
+              return false;
+            }
+            logMessage('Testing _signTypedData (this will trigger wallet prompt)...', 'info');
+            try {
+              const result = await provider.tronWeb.trx._signTypedData(
+                { name: 'Test' },
+                { message: { type: 'string' } },
+                { message: 'Test typed data' }
+              );
+              logMessage('_signTypedData successful', 'success', result ? 'Signature produced' : 'No signature');
+              return true;
+            } catch (err) {
+              logMessage(`_signTypedData failed: ${err.message || err}`, 'error');
+              return false;
+            }
+
+          case 'clear':
+            log.innerHTML = '';
+            eventLog = [];
+            return true;
+
+          case 'run-all':
+            await runAllTests();
+            return true;
+
+          default:
+            logMessage(`Unknown test: ${testName}`, 'warning');
+            return false;
+        }
+      } catch (err) {
+        logMessage(`Test "${testName}" crashed: ${err.message || err}`, 'error', err.stack);
+        return false;
+      }
+    }
+
+    async function runAllTests() {
+      logMessage('=== RUNNING ALL TESTS ===', 'info');
+      setButtonsEnabled(false);
+
+      const tests = [
+        'provider',
+        'init',
+        'state',
+        'tronweb',
+        'address',
+        'ready',
+        'listen-events',
+        'rpc-chain',
+        'rpc-block',
+        'rpc-balance',
+        'sign-message',
+        'typed-data',
+      ];
+
+      let passed = 0;
+      let failed = 0;
+
+      for (const test of tests) {
+        logMessage(`\n>>> Running: ${test}`, 'request');
+        const result = await runTest(test);
+        if (result) {
+          passed++;
+        } else {
+          failed++;
+        }
+      }
+
+      logMessage(`\n=== TEST SUMMARY ===`, 'info');
+      logMessage(`Passed: ${passed}`, 'success');
+      logMessage(`Failed: ${failed}`, failed > 0 ? 'warning' : 'success');
+      logMessage(`Total:  ${tests.length}`, 'info');
+
+      setButtonsEnabled(true);
+    }
+
+    // Command handling
+    commandInput.addEventListener('keypress', async (e) => {
+      if (e.key === 'Enter') {
+        const cmd = commandInput.value.trim().toLowerCase();
+        if (cmd) {
+          logMessage(`$ ${cmd}`, 'request');
+          const testBtn = document.querySelector(`[data-test="${cmd}"]`);
+          if (testBtn && !testBtn.classList.contains('disabled')) {
+            await runTest(cmd);
+          } else if (cmd === 'help') {
+            logMessage('Available commands:', 'info');
+            logMessage('  provider, init, state, accounts, tronweb, address, ready', 'info');
+            logMessage('  listen-events, trigger-connect, trigger-accounts', 'info');
+            logMessage('  rpc-chain, rpc-block, rpc-balance', 'info');
+            logMessage('  sign, sign-message, typed-data, run-all, clear', 'info');
+          } else if (cmd === 'status') {
+            logMessage('Test results:', 'info', testResults);
+          } else if (cmd === 'events') {
+            logMessage('Event log:', 'info', eventLog);
+          } else {
+            logMessage(`Unknown command: ${cmd}. Type "help" for list.`, 'warning');
+          }
+        }
+        commandInput.value = '';
+      }
+    });
+
+    // Button handlers
+    testButtons.forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const test = btn.dataset.test;
+        if (btn.classList.contains('disabled')) return;
+        await runTest(test);
+      });
+    });
+
+    // Wait for provider to load
+    async function init() {
+      logMessage('BEARBY TRON PROVIDER TEST SUITE', 'info');
+      logMessage('System Shock 2 Interface v1.0', 'info');
+      logMessage('----------------------------------------', 'info');
+
+      // Check if provider loaded
+      await runTest('provider');
+
+      if (provider) {
+        updateStatus('PROVIDER DETECTED - READY');
+        // Auto-run some basic checks
+        setTimeout(async () => {
+          await runTest('state');
+          await runTest('tronweb');
+        }, 500);
+      } else {
+        updateStatus('NO PROVIDER - CHECK CONSOLE', true);
+        logMessage('ERROR: Tron provider not found. Make sure Bearby wallet is injected.', 'error');
+      }
+    }
+
+    // Start
+    setTimeout(init, 1000);
+    commandInput.focus();
+
+    // Auto-focus on click anywhere
+    document.addEventListener('click', () => commandInput.focus());
+  </script>
 </body>
 </html>
