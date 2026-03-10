@@ -28,7 +28,6 @@
     "check": "tsc --noEmit"
   },
   "devDependencies": {
-    "@agrozyme/types-tronweb": "^5.3.2",
     "@types/bun": "latest",
     "typescript": "^5.9.3"
   },
@@ -42,8 +41,5 @@
     "tronweb",
     "blockchain",
     "wallet"
-  ],
-  "dependencies": {
-    "tronweb": "^6.2.2"
-  }
+  ]
 }
