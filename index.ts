@@ -1,9 +1,11 @@
-import { FlutterTunnel } from "./src/flutter-tunnel.js";
-import { RequestHandler } from "./src/request-handler.js";
-import { TronProvider } from "./src/tron-provider.js";
+import { BearbyProviderImpl } from './src/bearby-provider';
+
+export * from './src/types';
+export * from './src/bearby-provider';
 
 (function() {
   if (typeof window === 'undefined' || !window) {
+    console.warn('No window object available for Bearby injection');
     return;
   }
 
@@ -12,27 +14,26 @@ import { TronProvider } from "./src/tron-provider.js";
   }
 
   try {
-    const tunnel = new FlutterTunnel();
-    const handler = new RequestHandler(tunnel);
-    const providerObj = new TronProvider(tunnel, handler);
-    const provider = providerObj.getProvider();
+    const provider = new BearbyProviderImpl();
 
     if (!('tron' in window) || !window.tron) {
       try {
         Object.defineProperty(window, 'tron', {
-          value: provider,
+          value: provider.getProvider(),
           writable: false,
           configurable: true,
         });
-      } catch (e) {
-        (window as any).tron = provider;
+      } catch (defineError) {
+        (window as any).tron = provider.getProvider();
+        console.warn('Using fallback assignment for tron due to:', defineError);
       }
     }
 
-    providerObj.init();
+    provider.init();
 
     (window as any).__bearbyTronInjected = true;
     window.dispatchEvent(new Event('tron#initialized'));
-  } catch (e) {
+  } catch (error) {
+    console.error('Failed to inject Tron provider:', error);
   }
 })();
