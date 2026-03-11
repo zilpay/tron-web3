@@ -258,6 +258,7 @@
         <div class="category">SIGNING</div>
         <button class="test-btn" data-test="sign">Test Sign</button>
         <button class="test-btn" data-test="sign-message">Test Sign Message V2</button>
+        <button class="test-btn" data-test="sign-message-api">Test Sign Message (Tron API)</button>
         <button class="test-btn" data-test="multi-sign">Test MultiSign</button>
         <button class="test-btn" data-test="typed-data">Test Sign Typed Data</button>
 
@@ -363,7 +364,16 @@
           case 'state':
             if (!provider) return false;
             const hasTronWeb = !!provider.tronWeb;
+            console.log('=== STATE DEBUG ===');
+            console.log('tronWeb.ready:', provider.tronWeb?.ready);
+            console.log('tronWeb.defaultAddress:', JSON.stringify(provider.tronWeb?.defaultAddress));
+            console.log('tronWeb.isTronLink:', provider.tronWeb?.isTronLink);
+            console.log('tronWeb.isBearby:', provider.tronWeb?.isBearby);
             logMessage(`Has tronWeb: ${hasTronWeb}`, hasTronWeb ? 'success' : 'warning');
+            if (hasTronWeb) {
+              logMessage(`tronWeb.ready: ${provider.tronWeb.ready}`, 'info');
+              logMessage(`defaultAddress: ${JSON.stringify(provider.tronWeb.defaultAddress)}`, 'info');
+            }
             testResults.hasTronWeb = hasTronWeb;
             return hasTronWeb;
 
@@ -533,6 +543,40 @@
               return true;
             } catch (err) {
               logMessage(`SignMessageV2 failed: ${err.message || err}`, 'error');
+              return false;
+            }
+
+          case 'sign-message-api':
+            if (!provider) {
+              logMessage('Provider not found', 'warning');
+              return false;
+            }
+            console.log('=== SIGN DEBUG ===');
+            console.log('tronWeb.ready:', provider.tronWeb?.ready);
+            console.log('tronWeb.defaultAddress:', JSON.stringify(provider.tronWeb?.defaultAddress));
+            logMessage('Testing Tron API personal_sign (this will trigger wallet prompt)...', 'info');
+            try {
+              let accounts;
+              if (provider.tronWeb?.ready) {
+                accounts = [provider.tronWeb.defaultAddress?.base58];
+              }
+              if (!accounts?.[0]) {
+                accounts = await provider.request({ method: 'eth_requestAccounts' });
+              }
+              if (!accounts?.[0]) {
+                logMessage('No account available - connect wallet first', 'warning');
+                return false;
+              }
+              const message = 'Hello from Tron API';
+              const result = await provider.request({
+                method: 'personal_sign',
+                params: [message, accounts[0]]
+              });
+              logMessage('personal_sign successful', 'success', result ? 'Signature produced' : 'No signature');
+              testResults.signature = result;
+              return true;
+            } catch (err) {
+              logMessage(`personal_sign failed: ${err.message || err}`, 'error');
               return false;
             }
 

@@ -1,20 +1,17 @@
 {
   "name": "@bearby/web3-tron",
   "version": "0.1.0",
-  "description": "A Web3 provider for the Bearby wallet to interact with Tron-compatible chains.",
   "author": "Rinat lich666black@gmail.com",
-  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/nicola/web3-tron.git"
   },
-  "type": "module",
-  "files": [
-    "dist"
-  ],
   "main": "./dist/index.js",
   "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.9.3"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -22,19 +19,10 @@
       "require": "./dist/index.js"
     }
   },
-  "scripts": {
-    "dev": "bun build ./index.ts --outdir ./dist --target browser --format iife --no-minify",
-    "build": "bun build index.ts --outdir ./dist --target browser --minify --sourcemap=none --format iife",
-    "serve": "bun run build && bun server.ts",
-    "check": "tsc --noEmit"
-  },
-  "devDependencies": {
-    "@types/bun": "latest",
-    "typescript": "^5.9.3"
-  },
-  "publishConfig": {
-    "access": "public"
-  },
+  "description": "A Web3 provider for the Bearby wallet to interact with Tron-compatible chains.",
+  "files": [
+    "dist"
+  ],
   "keywords": [
     "bearby",
     "web3",
@@ -43,6 +31,18 @@
     "blockchain",
     "wallet"
   ],
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "dev": "bun build ./index.ts --outdir ./dist --target browser --format iife --no-minify",
+    "build": "bun build index.ts --outdir ./dist --target browser --minify --sourcemap=none --format iife",
+    "serve": "bun run build && bun server.ts",
+    "check": "tsc --noEmit"
+  },
+  "type": "module",
+  "types": "./dist/index.d.ts",
   "dependencies": {
     "tronweb": "^6.2.2"
   }

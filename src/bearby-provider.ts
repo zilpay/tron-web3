@@ -3,7 +3,7 @@ import { getMetaDataFromTags } from './meta';
 import { uuidv4 } from './uuid';
 import { isFunction, isTronAddress } from './utils';
 import TronWeb from 'tronweb';
-import type { TronWeb as TronWebType } from 'tronweb';
+import type { TronWeb, TronWeb as TronWebType } from 'tronweb';
 import type {
   ProviderRpcError,
   ProviderConnectInfo,
@@ -33,7 +33,7 @@ export class BearbyProviderImpl {
 
   #eventListeners: Map<string, Set<(...args: any[]) => void>> = new Map();
   #isFlutterMode: boolean;
-  #tronProvider: any;
+  #tronProvider: TronWebType | null = null;
   #chainId?: string;
   #nodeConfig?: NodeConfig;
 
@@ -135,25 +135,14 @@ export class BearbyProviderImpl {
       this.emit('chainChanged', this.#chainId);
     }
 
+    this.#buildTronWebStub(data);
     this.emit('dataChanged', data);
   }
 
-  #tronWebInstance: TronWebType | null = null;
+  #tronWebInstance: any | null = null;
 
-  get tronWeb(): TronWebType | false {
-    const address = this.#tronProvider?.defaultAddress?.base58;
-    if (!address) {
-      return false;
-    }
-
-    if (!this.#tronWebInstance) {
-      const fullHost = this.#nodeConfig?.fullNode || 'https://api.trongrid.io';
-      this.#tronWebInstance = new TronWeb.TronWeb({
-        fullHost,
-      });
-      this.#tronWebInstance.setAddress(address);
-    }
-    return this.#tronWebInstance;
+  get tronWeb() {
+    return this.#tronProvider ?? false;
   }
 
   getProvider(): any {
@@ -181,6 +170,13 @@ export class BearbyProviderImpl {
         name: data.name,
         type: data.type,
       };
+
+      this.#nodeConfig = data.node;
+      const fullHost = this.#nodeConfig?.fullNode || 'https://api.trongrid.io';
+      this.#tronWebInstance = new TronWeb.TronWeb({
+        fullHost,
+      });
+      this.#tronWebInstance.setAddress(data.address);
     }
 
     stub.trx = {
@@ -394,6 +390,8 @@ export class BearbyProviderImpl {
   }
 
   signMessageV2(message: any, privateKey: any = false, options: any = {}, callback: any = false): any {
+    console.log('[BearbyProvider] signMessageV2 called with:', { message, privateKey, options });
+
     if (isFunction(options)) {
       callback = options;
       options = {};
@@ -418,6 +416,8 @@ export class BearbyProviderImpl {
     if (!this.#tronProvider.ready) {
       return callback("User has not unlocked wallet");
     }
+
+    console.log('[BearbyProvider] Calling tron_signMessageV2 with:', { message, options });
 
     this.request({
       method: 'tron_signMessageV2',
