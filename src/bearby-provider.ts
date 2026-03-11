@@ -12,6 +12,7 @@ import type {
   InitProviderData,
 } from './types';
 import { MESSAGE_TYPE, BEARBY_INJECTED_EVENT, BEARBY_CONTENT_EVENT, RpcErrorCode } from './types';
+import type { NodeConfig } from './types';
 
 export class BearbyProviderImpl {
   readonly isBearby: boolean = true;
@@ -33,6 +34,7 @@ export class BearbyProviderImpl {
   #isFlutterMode: boolean;
   #tronProvider: any;
   #chainId?: string;
+  #nodeConfig?: NodeConfig;
 
   constructor() {
     this.#isFlutterMode = typeof window !== 'undefined' && typeof (window as any).flutter_inappwebview !== 'undefined';
@@ -56,6 +58,7 @@ export class BearbyProviderImpl {
     this.#eventListeners.set('chainChanged', new Set<(chainId: string) => void>());
     this.#eventListeners.set('accountsChanged', new Set<(accounts: string[]) => void>());
     this.#eventListeners.set('message', new Set<(message: ProviderMessage) => void>());
+    this.#eventListeners.set('dataChanged', new Set<(data: InitProviderData) => void>());
   }
 
   #setupFlutterEventHandler(): void {
@@ -78,6 +81,9 @@ export class BearbyProviderImpl {
               break;
             case 'message':
               listeners.forEach(callback => callback(eventData.data as ProviderMessage));
+              break;
+            case 'dataChanged':
+              this.#handleInitProviderData(eventData.data as InitProviderData);
               break;
           }
         }
@@ -104,6 +110,33 @@ export class BearbyProviderImpl {
     });
   }
 
+  #handleInitProviderData(data: InitProviderData): void {
+    const oldAddress = this.#tronProvider?.defaultAddress?.base58;
+    const oldChainId = this.#chainId;
+
+    this.#chainId = data.chainId;
+    this.#nodeConfig = data.node;
+
+    this.#tronProvider = this.#buildTronWebStub(data);
+    this.#tronWebInstance = null;
+
+    const newAddress = data.isAuth ? data.address : null;
+
+    if (!oldAddress && newAddress) {
+      this.emit('connect', { chainId: this.#chainId });
+    }
+
+    if (oldAddress !== newAddress) {
+      this.emit('accountsChanged', newAddress ? [newAddress] : []);
+    }
+
+    if (oldChainId !== this.#chainId) {
+      this.emit('chainChanged', this.#chainId);
+    }
+
+    this.emit('dataChanged', data);
+  }
+
   #tronWebInstance: TronWebType | null = null;
 
   get tronWeb(): TronWebType | false {
@@ -113,8 +146,9 @@ export class BearbyProviderImpl {
     }
 
     if (!this.#tronWebInstance) {
+      const fullHost = this.#nodeConfig?.fullNode || 'https://api.trongrid.io';
       this.#tronWebInstance = new TronWeb.TronWeb({
-        fullHost: 'https://api.trongrid.io',
+        fullHost,
       });
       this.#tronWebInstance.setAddress(address);
     }
@@ -128,6 +162,7 @@ export class BearbyProviderImpl {
   async init(): Promise<void> {
     const data = await this.#getProviderInitData();
     this.#chainId = data?.chainId;
+    this.#nodeConfig = data?.node;
     this.#tronProvider = this.#buildTronWebStub(data);
     this.emit('connect', { chainId: this.#chainId });
   }
@@ -163,7 +198,6 @@ export class BearbyProviderImpl {
   }
 
   async request(payload: { method: string; params?: any }): Promise<unknown> {
-    console.log('TRON request:', JSON.stringify(payload));
 
     if (!this.supportedMethods.has(payload.method)) {
       const error = {
@@ -171,7 +205,6 @@ export class BearbyProviderImpl {
         code: RpcErrorCode.UNSUPPORTED_METHOD,
         data: { method: payload.method },
       } as ProviderRpcError;
-      console.log('TRON response:', JSON.stringify(error));
       return Promise.reject(error);
     }
 
@@ -182,10 +215,8 @@ export class BearbyProviderImpl {
       } else {
         result = await this.#requestExtension(payload);
       }
-      console.log('TRON response:', JSON.stringify(result));
       return result;
     } catch (error: any) {
-      console.log('TRON response:', JSON.stringify(error));
       throw error;
     }
   }
@@ -330,6 +361,7 @@ export class BearbyProviderImpl {
   async #refreshState(): Promise<void> {
     const data = await this.#getProviderInitData();
     this.#chainId = data?.chainId;
+    this.#nodeConfig = data?.node;
     this.#tronProvider = this.#buildTronWebStub(data);
   }
 
