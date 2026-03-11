@@ -170,12 +170,11 @@ export class BearbyProviderImpl {
 
   #buildTronWebStub(data?: InitProviderData): any {
     const stub: any = {
-      ready: false,
+      ready: true,
       defaultAddress: { hex: false, base58: false },
     };
 
     if (data?.isAuth && isTronAddress(data.address)) {
-      stub.ready = true;
       stub.defaultAddress = {
         hex: false,
         base58: data.address,
