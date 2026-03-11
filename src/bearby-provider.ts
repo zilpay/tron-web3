@@ -111,6 +111,13 @@ export class BearbyProviderImpl {
   }
 
   #handleInitProviderData(data: InitProviderData): void {
+    console.log('[BearBy] dataChanged event received:', JSON.stringify({
+      address: data.address,
+      isAuth: data.isAuth,
+      chainId: data.chainId,
+      node: data.node,
+    }));
+
     const oldAddress = this.#tronProvider?.defaultAddress?.base58;
     const oldChainId = this.#chainId;
 
@@ -121,6 +128,8 @@ export class BearbyProviderImpl {
     this.#tronWebInstance = null;
 
     const newAddress = data.isAuth ? data.address : null;
+
+    console.log('[BearBy] State updated - oldAddress:', oldAddress, 'newAddress:', newAddress, 'oldChainId:', oldChainId, 'newChainId:', this.#chainId);
 
     if (!oldAddress && newAddress) {
       this.emit('connect', { chainId: this.#chainId });
@@ -147,6 +156,7 @@ export class BearbyProviderImpl {
 
     if (!this.#tronWebInstance) {
       const fullHost = this.#nodeConfig?.fullNode || 'https://api.trongrid.io';
+      console.log('[BearBy] Creating TronWeb instance with:', JSON.stringify({ address, fullHost }));
       this.#tronWebInstance = new TronWeb.TronWeb({
         fullHost,
       });
