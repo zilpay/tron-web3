@@ -15,17 +15,42 @@ export * from './src/bearby-provider';
 
   try {
     const provider = new BearbyProviderImpl();
+    const tronProvider = provider.getProvider();
 
     if (!('tron' in window) || !window.tron) {
       try {
         Object.defineProperty(window, 'tron', {
-          value: provider.getProvider(),
+          value: tronProvider,
           writable: false,
           configurable: true,
         });
       } catch (defineError) {
-        (window as any).tron = provider.getProvider();
+        (window as any).tron = tronProvider;
         console.warn('Using fallback assignment for tron due to:', defineError);
+      }
+    }
+
+    if (!('tronLink' in window) || !window.tronLink) {
+      try {
+        Object.defineProperty(window, 'tronLink', {
+          value: tronProvider,
+          writable: false,
+          configurable: true,
+        });
+      } catch (defineError) {
+        (window as any).tronLink = tronProvider;
+      }
+    }
+
+    if (!('tronWeb' in window) || !window.tronWeb) {
+      try {
+        Object.defineProperty(window, 'tronWeb', {
+          value: tronProvider,
+          writable: false,
+          configurable: true,
+        });
+      } catch (defineError) {
+        (window as any).tronWeb = tronProvider;
       }
     }
 
