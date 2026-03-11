@@ -16,6 +16,7 @@ import type { NodeConfig } from './types';
 
 export class BearbyProviderImpl {
   readonly isBearby: boolean = true;
+  readonly isTronLink: boolean = true;
   readonly supportedMethods: Set<string> = new Set([
     'tron_requestAccounts',
     'tron_sign',
@@ -355,26 +356,6 @@ export class BearbyProviderImpl {
       return await this.request({ method: 'getInitProviderData' }) as InitProviderData | undefined;
     } catch {
       return undefined;
-    }
-  }
-
-  async #refreshState(): Promise<void> {
-    const data = await this.#getProviderInitData();
-    this.#chainId = data?.chainId;
-    this.#nodeConfig = data?.node;
-    this.#tronProvider = this.#buildTronWebStub(data);
-  }
-
-  async #doTronRequest(args: any): Promise<any> {
-    try {
-      return await this.request({ method: 'tronProviderRequest', params: args });
-    } catch (err: any) {
-      const rpcError: ProviderRpcError = {
-        code: err?.code ?? RpcErrorCode.GENERIC_ERROR,
-        message: err?.message ?? String(err),
-        data: err?.data,
-      } as ProviderRpcError;
-      throw rpcError;
     }
   }
 
