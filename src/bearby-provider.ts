@@ -2,6 +2,8 @@ import { getFavicon } from './favicon';
 import { getMetaDataFromTags } from './meta';
 import { uuidv4 } from './uuid';
 import { isFunction, isTronAddress } from './utils';
+import TronWeb from 'tronweb';
+import type { TronWeb as TronWebType } from 'tronweb';
 import type {
   ProviderRpcError,
   ProviderConnectInfo,
@@ -102,18 +104,32 @@ export class BearbyProviderImpl {
     });
   }
 
+  #tronWebInstance: TronWebType | null = null;
+
+  get tronWeb(): TronWebType | false {
+    const address = this.#tronProvider?.defaultAddress?.base58;
+    if (!address) {
+      return false;
+    }
+
+    if (!this.#tronWebInstance) {
+      this.#tronWebInstance = new TronWeb.TronWeb({
+        fullHost: 'https://api.trongrid.io',
+      });
+      this.#tronWebInstance.setAddress(address);
+    }
+    return this.#tronWebInstance;
+  }
+
   getProvider(): any {
-    return this.#tronProvider;
+    return this;
   }
 
   async init(): Promise<void> {
     const data = await this.#getProviderInitData();
     this.#chainId = data?.chainId;
     this.#tronProvider = this.#buildTronWebStub(data);
-    
-    setTimeout(() => {
-      this.#tronProvider.emit?.('connect', { chainId: this.#chainId });
-    }, 100);
+    this.emit('connect', { chainId: this.#chainId });
   }
 
   #buildTronWebStub(data?: InitProviderData): any {
@@ -139,23 +155,39 @@ export class BearbyProviderImpl {
       _signTypedData: this._signTypedData.bind(this),
     };
 
+    stub.emit = (event: string, ...args: any[]) => {
+      this.emit(event, ...args);
+    };
+
     return stub;
   }
 
   async request(payload: { method: string; params?: any }): Promise<unknown> {
+    console.log('TRON request:', JSON.stringify(payload));
+
     if (!this.supportedMethods.has(payload.method)) {
-      return Promise.reject({
+      const error = {
         message: 'Unsupported method',
         code: RpcErrorCode.UNSUPPORTED_METHOD,
         data: { method: payload.method },
-      } as ProviderRpcError);
+      } as ProviderRpcError;
+      console.log('TRON response:', JSON.stringify(error));
+      return Promise.reject(error);
     }
 
-    if (this.#isFlutterMode) {
-      return this.#requestFlutter(payload);
+    try {
+      let result: unknown;
+      if (this.#isFlutterMode) {
+        result = await this.#requestFlutter(payload);
+      } else {
+        result = await this.#requestExtension(payload);
+      }
+      console.log('TRON response:', JSON.stringify(result));
+      return result;
+    } catch (error: any) {
+      console.log('TRON response:', JSON.stringify(error));
+      throw error;
     }
-
-    return this.#requestExtension(payload);
   }
 
   #requestFlutter(payload: { method: string; params?: any }): Promise<unknown> {

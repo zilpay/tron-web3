@@ -42,5 +42,8 @@
     "tronweb",
     "blockchain",
     "wallet"
-  ]
+  ],
+  "dependencies": {
+    "tronweb": "^6.2.2"
+  }
 }
