@@ -31,6 +31,7 @@ export * from './src/bearby-provider';
 
     provider.init();
 
+    (window as any).__bearby_response_handlers = (window as any).__bearby_response_handlers || {};
     (window as any).__bearbyTronInjected = true;
     window.dispatchEvent(new Event('tron#initialized'));
   } catch (error) {
