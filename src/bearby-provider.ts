@@ -3,7 +3,6 @@ import { getMetaDataFromTags } from './meta';
 import { uuidv4 } from './uuid';
 import { isFunction, isTronAddress } from './utils';
 import TronWeb from 'tronweb';
-import type { TronWeb, TronWeb as TronWebType } from 'tronweb';
 import type {
   ProviderRpcError,
   ProviderConnectInfo,
@@ -33,7 +32,7 @@ export class BearbyProviderImpl {
 
   #eventListeners: Map<string, Set<(...args: any[]) => void>> = new Map();
   #isFlutterMode: boolean;
-  #tronProvider: TronWebType | null = null;
+  #tronProvider: any = null;
   #chainId?: string;
   #nodeConfig?: NodeConfig;
 
@@ -45,6 +44,14 @@ export class BearbyProviderImpl {
     if (!this.#isFlutterMode) {
       this.#setupDocumentListener();
     }
+  }
+
+  #postTronLinkMessage(action: string, data: any): void {
+    if (typeof window === 'undefined') return;
+    window.postMessage({
+      isTronLink: true,
+      message: { action, data },
+    }, '*');
   }
 
   #createProviderProxy(): any {
@@ -78,7 +85,13 @@ export class BearbyProviderImpl {
               listeners.forEach(callback => callback(eventData.data as string));
               break;
             case 'accountsChanged':
-              listeners.forEach(callback => callback(eventData.data as string[]));
+              const accounts = eventData.data as string[];
+              const address = accounts.length > 0 ? accounts[0] : false;
+              if (this.#tronProvider?.defaultAddress) {
+                this.#tronProvider.defaultAddress.base58 = address;
+              }
+              this.#postTronLinkMessage('accountsChanged', { address });
+              listeners.forEach(callback => callback(accounts));
               break;
             case 'message':
               listeners.forEach(callback => callback(eventData.data as ProviderMessage));
@@ -114,6 +127,7 @@ export class BearbyProviderImpl {
   #handleInitProviderData(data: InitProviderData): void {
     const oldAddress = this.#tronProvider?.defaultAddress?.base58;
     const oldChainId = this.#chainId;
+    const newAddress = data.isAuth ? data.address : null;
 
     this.#chainId = data.chainId;
     this.#nodeConfig = data.node;
@@ -121,25 +135,29 @@ export class BearbyProviderImpl {
     this.#tronProvider = this.#buildTronWebStub(data);
     this.#tronWebInstance = null;
 
-    const newAddress = data.isAuth ? data.address : null;
-
     if (!oldAddress && newAddress) {
       this.emit('connect', { chainId: this.#chainId });
+      this.#postTronLinkMessage('connect', { address: newAddress });
     }
 
     if (oldAddress !== newAddress) {
       this.emit('accountsChanged', newAddress ? [newAddress] : []);
+      this.#postTronLinkMessage('accountsChanged', { address: newAddress || false });
     }
 
     if (oldChainId !== this.#chainId) {
       this.emit('chainChanged', this.#chainId);
+      this.#postTronLinkMessage('setNode', { chainId: this.#chainId });
     }
 
-    this.#buildTronWebStub(data);
     this.emit('dataChanged', data);
   }
 
   #tronWebInstance: any | null = null;
+
+  get ready(): boolean {
+    return this.#tronProvider?.ready ?? false;
+  }
 
   get tronWeb() {
     return this.#tronProvider ?? false;
@@ -390,8 +408,6 @@ export class BearbyProviderImpl {
   }
 
   signMessageV2(message: any, privateKey: any = false, options: any = {}, callback: any = false): any {
-    console.log('[BearbyProvider] signMessageV2 called with:', { message, privateKey, options });
-
     if (isFunction(options)) {
       callback = options;
       options = {};
@@ -416,8 +432,6 @@ export class BearbyProviderImpl {
     if (!this.#tronProvider.ready) {
       return callback("User has not unlocked wallet");
     }
-
-    console.log('[BearbyProvider] Calling tron_signMessageV2 with:', { message, options });
 
     this.request({
       method: 'tron_signMessageV2',
