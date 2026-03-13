@@ -12,8 +12,8 @@ function rgbToHex(rgb: string): string {
 export function getMetaDataFromTags(): MetaData {
   if (typeof document === 'undefined') {
     return {
-      description: null,
-      title: null,
+      description: '',
+      title: '',
       colors: null,
     };
   }
@@ -54,8 +54,8 @@ export function getMetaDataFromTags(): MetaData {
   };
 
   return {
-    description,
-    title,
+    description: description || '',
+    title: title || document.title || '',
     colors,
   };
 }

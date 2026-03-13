@@ -13,6 +13,14 @@ import type {
 import { MESSAGE_TYPE, BEARBY_INJECTED_EVENT, BEARBY_CONTENT_EVENT, RpcErrorCode } from './types';
 import type { NodeConfig } from './types';
 
+function safeStringify(data: any): string {
+  try {
+    return JSON.stringify(data);
+  } catch (_) {
+    return '[non-serializable]';
+  }
+}
+
 export class BearbyProviderImpl {
   readonly isBearby: boolean = true;
   readonly isTronLink: boolean = true;
@@ -38,15 +46,21 @@ export class BearbyProviderImpl {
 
   constructor() {
     this.#isFlutterMode = typeof window !== 'undefined' && typeof (window as any).flutter_inappwebview !== 'undefined';
+    console.log('[BearbyTron] constructor: isFlutterMode=' + this.#isFlutterMode);
     this.#tronProvider = this.#createProviderProxy();
+    console.log('[BearbyTron] constructor: proxy created');
     this.#initializeEvents();
+    console.log('[BearbyTron] constructor: events initialized');
     this.#setupFlutterEventHandler();
+    console.log('[BearbyTron] constructor: flutter event handler setup');
     if (!this.#isFlutterMode) {
       this.#setupDocumentListener();
+      console.log('[BearbyTron] constructor: document listener setup');
     }
   }
 
   #postTronLinkMessage(action: string, data: any): void {
+    console.log('[BearbyTron] postTronLinkMessage: action=' + action + ' data=' + safeStringify(data));
     if (typeof window === 'undefined') return;
     window.postMessage({
       isTronLink: true,
@@ -72,6 +86,7 @@ export class BearbyProviderImpl {
   #setupFlutterEventHandler(): void {
     if (typeof window !== 'undefined' && window) {
       (window as any).handleBearbyEvent = (eventData: BearbyEventData) => {
+        console.log('[BearbyTron] handleBearbyEvent: ' + safeStringify(eventData));
         const listeners = this.#eventListeners.get(eventData.event);
         if (listeners) {
           switch (eventData.event) {
@@ -114,46 +129,50 @@ export class BearbyProviderImpl {
 
       try {
         const msg = typeof detail === 'string' ? JSON.parse(detail) : detail;
-        
+        console.log('[BearbyTron] documentListener: msg=' + safeStringify(msg));
+
         if (msg.type === MESSAGE_TYPE.EVENT && (window as any).handleBearbyEvent) {
           (window as any).handleBearbyEvent(msg.payload);
         }
       } catch (error) {
+        console.log('[BearbyTron] documentListener parse error: ' + safeStringify(error));
         console.error('Error parsing BearBy event:', error);
       }
     });
   }
 
   #handleInitProviderData(data: InitProviderData): void {
+    console.log('[BearbyTron] handleInitProviderData: data=' + safeStringify(data));
     const oldAddress = this.#tronProvider?.defaultAddress?.base58;
     const oldChainId = this.#chainId;
     const newAddress = data.isAuth ? data.address : null;
+    console.log('[BearbyTron] handleInitProviderData: oldAddress=' + oldAddress + ' newAddress=' + newAddress + ' oldChainId=' + oldChainId + ' newChainId=' + data.chainId);
 
     this.#chainId = data.chainId;
     this.#nodeConfig = data.node;
 
-    this.#tronProvider = this.#buildTronWebStub(data);
-    this.#tronWebInstance = null;
+    this.#tronProvider = this.#buildTronWeb(data);
 
     if (!oldAddress && newAddress) {
+      console.log('[BearbyTron] handleInitProviderData: emitting connect');
       this.emit('connect', { chainId: this.#chainId });
       this.#postTronLinkMessage('connect', { address: newAddress });
     }
 
     if (oldAddress !== newAddress) {
+      console.log('[BearbyTron] handleInitProviderData: emitting accountsChanged');
       this.emit('accountsChanged', newAddress ? [newAddress] : []);
       this.#postTronLinkMessage('accountsChanged', { address: newAddress || false });
     }
 
     if (oldChainId !== this.#chainId) {
+      console.log('[BearbyTron] handleInitProviderData: emitting chainChanged');
       this.emit('chainChanged', this.#chainId);
       this.#postTronLinkMessage('setNode', { chainId: this.#chainId });
     }
 
     this.emit('dataChanged', data);
   }
-
-  #tronWebInstance: any | null = null;
 
   get ready(): boolean {
     return this.#tronProvider?.ready ?? false;
@@ -168,50 +187,43 @@ export class BearbyProviderImpl {
   }
 
   async init(): Promise<void> {
+    console.log('[BearbyTron] init: start');
     const data = await this.#getProviderInitData();
+    console.log('[BearbyTron] init: received data=' + safeStringify(data));
     this.#chainId = data?.chainId;
     this.#nodeConfig = data?.node;
-    this.#tronProvider = this.#buildTronWebStub(data);
+    this.#tronProvider = this.#buildTronWeb(data);
     this.emit('connect', { chainId: this.#chainId });
+    console.log('[BearbyTron] init: complete');
   }
 
-  #buildTronWebStub(data?: InitProviderData): any {
-    const stub: any = {
-      ready: true,
-      defaultAddress: { hex: false, base58: false },
-    };
+  #buildTronWeb(data?: InitProviderData): any {
+    const isAuth = data?.isAuth && isTronAddress(data.address);
+    console.log('[BearbyTron] buildTronWeb: isAuth=' + isAuth + ' address=' + (data?.address || 'none'));
 
-    if (data?.isAuth && isTronAddress(data.address)) {
-      stub.defaultAddress = {
-        hex: false,
-        base58: data.address,
-        name: data.name,
-        type: data.type,
-      };
-
-      this.#nodeConfig = data.node;
-      const fullHost = this.#nodeConfig?.fullNode || 'https://api.trongrid.io';
-      this.#tronWebInstance = new TronWeb.TronWeb({
-        fullHost,
-      });
-      this.#tronWebInstance.setAddress(data.address);
+    if (!isAuth) {
+      return { ready: true, defaultAddress: { hex: false, base58: false } };
     }
 
-    stub.trx = {
-      sign: this.sign.bind(this),
-      signMessageV2: this.signMessageV2.bind(this),
-      multiSign: this.multiSign.bind(this),
-      _signTypedData: this._signTypedData.bind(this),
-    };
+    this.#nodeConfig = data!.node;
+    const fullHost = this.#nodeConfig?.fullNode || 'https://api.trongrid.io';
+    console.log('[BearbyTron] buildTronWeb: creating TronWeb fullHost=' + fullHost + ' address=' + data!.address);
 
-    stub.emit = (event: string, ...args: any[]) => {
-      this.emit(event, ...args);
-    };
+    const tw = new TronWeb.TronWeb({ fullHost });
+    tw.setAddress(data!.address);
+    (tw as any).ready = true;
+    (tw.defaultAddress as any).name = data!.name;
+    (tw.defaultAddress as any).type = data!.type;
+    tw.trx.sign = this.sign.bind(this);
+    tw.trx.signMessageV2 = this.signMessageV2.bind(this);
+    tw.trx.multiSign = this.multiSign.bind(this);
+    tw.trx._signTypedData = this._signTypedData.bind(this);
 
-    return stub;
+    return tw;
   }
 
   async request(payload: { method: string; params?: any }): Promise<unknown> {
+    console.log('[BearbyTron] request: method=' + payload.method + ' params=' + safeStringify(payload.params));
 
     if (!this.supportedMethods.has(payload.method)) {
       const error = {
@@ -219,18 +231,23 @@ export class BearbyProviderImpl {
         code: RpcErrorCode.UNSUPPORTED_METHOD,
         data: { method: payload.method },
       } as ProviderRpcError;
+      console.log('[BearbyTron] request: unsupported method=' + payload.method);
       return Promise.reject(error);
     }
 
     try {
       let result: unknown;
       if (this.#isFlutterMode) {
+        console.log('[BearbyTron] request: routing to Flutter');
         result = await this.#requestFlutter(payload);
       } else {
+        console.log('[BearbyTron] request: routing to Extension');
         result = await this.#requestExtension(payload);
       }
+      console.log('[BearbyTron] request: success result=' + safeStringify(result));
       return result;
     } catch (error: any) {
+      console.log('[BearbyTron] request: error=' + safeStringify(error));
       throw error;
     }
   }
@@ -249,7 +266,11 @@ export class BearbyProviderImpl {
         ...meta,
       };
 
+      console.log('[BearbyTron] requestFlutter: uuid=' + id + ' method=' + payload.method);
+      console.log('[BearbyTron] requestFlutter: message=' + safeStringify(message));
+
       if (typeof window === 'undefined' || !window || !(window as any).flutter_inappwebview) {
+        console.log('[BearbyTron] requestFlutter: flutter_inappwebview not available');
         reject({
           message: 'BearBy channel is not available',
           code: RpcErrorCode.DISCONNECTED,
@@ -257,30 +278,38 @@ export class BearbyProviderImpl {
         } as ProviderRpcError);
         return;
       }
-    
+
       const responseHandler = (event: MessageEvent) => {
         const data = event.data;
         if (!data || typeof data !== 'object') return;
-      
+
         if (data.type === MESSAGE_TYPE.RESPONSE && data.uuid === id) {
+          console.log('[BearbyTron] requestFlutter: response matched uuid=' + id + ' data=' + safeStringify(data));
           if (data.payload?.error) {
+            console.log('[BearbyTron] requestFlutter: response error=' + safeStringify(data.payload.error));
             reject({
               message: data.payload.error.message,
               code: data.payload.error.code || RpcErrorCode.GENERIC_ERROR,
               data: data.payload.error.data,
             } as ProviderRpcError);
           } else {
+            console.log('[BearbyTron] requestFlutter: response success=' + safeStringify(data.payload?.result));
             resolve(data.payload?.result);
           }
           window.removeEventListener('message', responseHandler);
         }
       };
-    
+
       window.addEventListener('message', responseHandler);
 
       try {
+        console.log('[BearbyTron] requestFlutter: calling callHandler TIP6963TRON');
         (window as any).flutter_inappwebview.callHandler('TIP6963TRON', JSON.stringify(message))
+          .then(() => {
+            console.log('[BearbyTron] requestFlutter: callHandler sent confirmation');
+          })
           .catch((error: any) => {
+            console.log('[BearbyTron] requestFlutter: callHandler catch error=' + safeStringify(error));
             window.removeEventListener('message', responseHandler);
             reject({
               message: `Failed to send request: ${error.message || 'Unknown error'}`,
@@ -289,6 +318,7 @@ export class BearbyProviderImpl {
             } as ProviderRpcError);
           });
       } catch (e: unknown) {
+        console.log('[BearbyTron] requestFlutter: callHandler throw error=' + safeStringify(e));
         window.removeEventListener('message', responseHandler);
         reject({
           message: `Failed to send request: ${(e as Error).message}`,
@@ -301,6 +331,7 @@ export class BearbyProviderImpl {
 
   #requestExtension(payload: { method: string; params?: any }): Promise<unknown> {
     if (typeof document === 'undefined') {
+      console.log('[BearbyTron] requestExtension: document undefined');
       return Promise.reject({
         message: 'BearBy extension is not available',
         code: RpcErrorCode.DISCONNECTED,
@@ -320,6 +351,8 @@ export class BearbyProviderImpl {
       ...meta,
     };
 
+    console.log('[BearbyTron] requestExtension: uuid=' + id + ' message=' + safeStringify(message));
+
     return new Promise((resolve, reject) => {
       const responseHandler = (event: Event) => {
         const detail = (event as CustomEvent).detail;
@@ -327,21 +360,25 @@ export class BearbyProviderImpl {
 
         try {
           const data = typeof detail === 'string' ? JSON.parse(detail) : detail;
-          
+
           if (data.type === MESSAGE_TYPE.RESPONSE && data.uuid === id) {
+            console.log('[BearbyTron] requestExtension: response matched uuid=' + id + ' data=' + safeStringify(data));
             document.removeEventListener(BEARBY_INJECTED_EVENT, responseHandler);
 
             if (data.payload?.error) {
+              console.log('[BearbyTron] requestExtension: response error=' + safeStringify(data.payload.error));
               reject({
                 message: data.payload.error.message,
                 code: data.payload.error.code || RpcErrorCode.GENERIC_ERROR,
                 data: data.payload.error.data,
               } as ProviderRpcError);
             } else {
+              console.log('[BearbyTron] requestExtension: response success=' + safeStringify(data.payload?.result));
               resolve(data.payload?.result);
             }
           }
         } catch (error) {
+          console.log('[BearbyTron] requestExtension: parse error=' + safeStringify(error));
           console.error('Error parsing response:', error);
         }
       };
@@ -353,7 +390,9 @@ export class BearbyProviderImpl {
           detail: JSON.stringify(message)
         });
         document.dispatchEvent(event);
+        console.log('[BearbyTron] requestExtension: event dispatched');
       } catch (e: unknown) {
+        console.log('[BearbyTron] requestExtension: dispatch error=' + safeStringify(e));
         document.removeEventListener(BEARBY_INJECTED_EVENT, responseHandler);
         reject({
           message: `Failed to send request: ${(e as Error).message}`,
@@ -365,14 +404,19 @@ export class BearbyProviderImpl {
   }
 
   async #getProviderInitData(): Promise<InitProviderData | undefined> {
+    console.log('[BearbyTron] getProviderInitData: start');
     try {
-      return await this.request({ method: 'getInitProviderData' }) as InitProviderData | undefined;
-    } catch {
+      const result = await this.request({ method: 'getInitProviderData' }) as InitProviderData | undefined;
+      console.log('[BearbyTron] getProviderInitData: result=' + safeStringify(result));
+      return result;
+    } catch (e) {
+      console.log('[BearbyTron] getProviderInitData: error=' + safeStringify(e));
       return undefined;
     }
   }
 
   sign(transaction: any, privateKey: any = false, useTronHeader: any = true, callback: any = false): any {
+    console.log('[BearbyTron] sign: hasTransaction=' + !!transaction + ' hasPrivateKey=' + !!privateKey + ' useTronHeader=' + useTronHeader + ' hasCallback=' + !!callback);
     if (isFunction(privateKey)) {
       callback = privateKey;
       privateKey = false;
@@ -402,12 +446,21 @@ export class BearbyProviderImpl {
       ? transaction
       : transaction.raw_data?.contract[0]?.parameter?.value;
 
-    this.request({ method: 'tron_sign', params: { transaction, useTronHeader, input: inputStr } })
-      .then((res) => callback(null, res))
-      .catch((err) => callback(err));
+    const params = { transaction, useTronHeader, input: inputStr };
+    console.log('[BearbyTron] sign: request params=' + safeStringify(params));
+    this.request({ method: 'tron_sign', params })
+      .then((res) => {
+        console.log('[BearbyTron] sign: success result=' + safeStringify(res));
+        callback(null, res);
+      })
+      .catch((err) => {
+        console.log('[BearbyTron] sign: error=' + safeStringify(err));
+        callback(err);
+      });
   }
 
   signMessageV2(message: any, privateKey: any = false, options: any = {}, callback: any = false): any {
+    console.log('[BearbyTron] signMessageV2: hasMessage=' + !!message + ' hasPrivateKey=' + !!privateKey + ' hasCallback=' + !!callback);
     if (isFunction(options)) {
       callback = options;
       options = {};
@@ -433,20 +486,26 @@ export class BearbyProviderImpl {
       return callback("User has not unlocked wallet");
     }
 
-    this.request({
-      method: 'tron_signMessageV2',
-      params: {
-        transaction: message,
-        options,
-        input: message,
-        isSignMessageV2: true,
-      }
-    })
-      .then((res) => callback(null, res))
-      .catch((err) => callback(err));
+    const params = {
+      transaction: message,
+      options,
+      input: message,
+      isSignMessageV2: true,
+    };
+    console.log('[BearbyTron] signMessageV2: request params=' + safeStringify(params));
+    this.request({ method: 'tron_signMessageV2', params })
+      .then((res) => {
+        console.log('[BearbyTron] signMessageV2: success result=' + safeStringify(res));
+        callback(null, res);
+      })
+      .catch((err) => {
+        console.log('[BearbyTron] signMessageV2: error=' + safeStringify(err));
+        callback(err);
+      });
   }
 
   multiSign(transaction: any = false, privateKey: any = false, permissionId: any = false, callback: any = false): any {
+    console.log('[BearbyTron] multiSign: hasTransaction=' + !!transaction + ' hasPrivateKey=' + !!privateKey + ' permissionId=' + permissionId + ' hasCallback=' + !!callback);
     if (isFunction(permissionId)) {
       callback = permissionId;
       permissionId = 0;
@@ -473,20 +532,26 @@ export class BearbyProviderImpl {
       return callback("Direct private key signing is not supported");
     }
 
-    this.request({
-      method: 'multiSign',
-      params: {
-        transaction,
-        useTronHeader: true,
-        input: (transaction as any).raw_data.contract[0].parameter.value,
-        permissionId,
-      }
-    })
-      .then((res) => callback(null, res, permissionId))
-      .catch((err) => callback(err));
+    const params = {
+      transaction,
+      useTronHeader: true,
+      input: (transaction as any).raw_data.contract[0].parameter.value,
+      permissionId,
+    };
+    console.log('[BearbyTron] multiSign: request params=' + safeStringify(params));
+    this.request({ method: 'multiSign', params })
+      .then((res) => {
+        console.log('[BearbyTron] multiSign: success result=' + safeStringify(res));
+        callback(null, res, permissionId);
+      })
+      .catch((err) => {
+        console.log('[BearbyTron] multiSign: error=' + safeStringify(err));
+        callback(err);
+      });
   }
 
   _signTypedData(domain: any, types: any, value: any, privateKey: any = false, callback: any = false): any {
+    console.log('[BearbyTron] _signTypedData: hasDomain=' + !!domain + ' hasTypes=' + !!types + ' hasValue=' + !!value + ' hasPrivateKey=' + !!privateKey + ' hasCallback=' + !!callback);
     if (isFunction(privateKey)) {
       callback = privateKey;
       privateKey = false;
@@ -508,12 +573,17 @@ export class BearbyProviderImpl {
       return callback("Invalid params provided");
     }
 
-    this.request({
-      method: '_signTypedData',
-      params: { domain, types, message: value }
-    })
-      .then((res) => callback(null, res))
-      .catch((err) => callback(err));
+    const params = { domain, types, message: value };
+    console.log('[BearbyTron] _signTypedData: request params=' + safeStringify(params));
+    this.request({ method: '_signTypedData', params })
+      .then((res) => {
+        console.log('[BearbyTron] _signTypedData: success result=' + safeStringify(res));
+        callback(null, res);
+      })
+      .catch((err) => {
+        console.log('[BearbyTron] _signTypedData: error=' + safeStringify(err));
+        callback(err);
+      });
   }
 
   #handlePromiseSign(method: Function, ...args: any[]): Promise<any> {
@@ -531,6 +601,7 @@ export class BearbyProviderImpl {
   on(event: 'accountsChanged', callback: (accounts: string[]) => void): void;
   on(event: 'message', callback: (message: ProviderMessage) => void): void;
   on(event: string, callback: (...args: any[]) => void): void {
+    console.log('[BearbyTron] on: event=' + event);
     const listeners = this.#eventListeners.get(event);
     if (listeners) {
       listeners.add(callback);
@@ -543,6 +614,7 @@ export class BearbyProviderImpl {
   removeListener(event: 'accountsChanged', callback: (accounts: string[]) => void): void;
   removeListener(event: 'message', callback: (message: ProviderMessage) => void): void;
   removeListener(event: string, callback: (...args: any[]) => void): void {
+    console.log('[BearbyTron] removeListener: event=' + event);
     const listeners = this.#eventListeners.get(event);
     if (listeners) {
       listeners.delete(callback);
@@ -550,6 +622,7 @@ export class BearbyProviderImpl {
   }
 
   emit(event: string, ...args: any[]): void {
+    console.log('[BearbyTron] emit: event=' + event + ' args=' + safeStringify(args));
     const listeners = this.#eventListeners.get(event);
     if (listeners) {
       listeners.forEach(callback => callback(...args));
@@ -557,6 +630,7 @@ export class BearbyProviderImpl {
   }
 
   async enable(): Promise<string[]> {
+    console.log('[BearbyTron] enable: called');
     return this.request({ method: 'eth_requestAccounts' }) as Promise<string[]>;
   }
 }
