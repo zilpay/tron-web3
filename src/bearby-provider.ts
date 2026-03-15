@@ -36,6 +36,7 @@ export class BearbyProviderImpl {
     'eth_requestAccounts',
     'eth_accounts',
     'eth_chainId',
+    'wallet_switchEthereumChain',
     'init',
   ]);
 
