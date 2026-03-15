@@ -84,7 +84,26 @@ export const enum RpcErrorCode {
   GENERIC_ERROR = 4000,
 }
 
+export interface TIP6963ProviderInfo {
+  uuid: string;
+  name: string;
+  icon: string;
+  rdns: string;
+}
+
+export interface TIP6963ProviderDetail {
+  info: TIP6963ProviderInfo;
+  provider: any;
+}
+
+export type TIP6963AnnounceProviderEvent = CustomEvent<TIP6963ProviderDetail>;
+
 declare global {
+  interface WindowEventMap {
+    'TIP6963:announceProvider': TIP6963AnnounceProviderEvent;
+    'TIP6963:requestProvider': Event;
+  }
+
   interface Window {
     tron?: any;
     tronWeb?: any;

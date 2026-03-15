@@ -1,7 +1,9 @@
 import { BearbyProviderImpl } from './src/bearby-provider';
+import { announceProvider, setupTIP6963RequestListener } from './src/tip6963';
 
 export * from './src/types';
 export * from './src/bearby-provider';
+export * from './src/tip6963';
 
 (function() {
   console.log('[BearbyTron] IIFE start');
@@ -71,6 +73,12 @@ export * from './src/bearby-provider';
 
     (window as any).__bearby_response_handlers = (window as any).__bearby_response_handlers || {};
     (window as any).__bearbyTronInjected = true;
+
+    // TIP-6963 provider discovery
+    setupTIP6963RequestListener(tronProvider);
+    announceProvider(tronProvider);
+    console.log('[BearbyTron] TIP-6963 provider announced');
+
     window.dispatchEvent(new Event('tron#initialized'));
     console.log('[BearbyTron] tron#initialized event dispatched');
     window.dispatchEvent(new Event('tronLink#initialized'));
