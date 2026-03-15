@@ -73,6 +73,8 @@ export * from './src/bearby-provider';
     (window as any).__bearbyTronInjected = true;
     window.dispatchEvent(new Event('tron#initialized'));
     console.log('[BearbyTron] tron#initialized event dispatched');
+    window.dispatchEvent(new Event('tronLink#initialized'));
+    console.log('[BearbyTron] tronLink#initialized event dispatched');
   } catch (error) {
     try {
       console.log('[BearbyTron] IIFE catch error: ' + JSON.stringify(error));
